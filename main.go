@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/chromedp/chromedp"
 )
@@ -76,5 +78,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	time.Sleep(50 * time.Second)
+	// Wait until either the browser is closed or Ctrl+C is pressed.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sig)
+
+	select {
+	case <-ctx.Done():
+		log.Println("Browser closed.")
+
+	case <-sig:
+		log.Println("Ctrl+C received.")
+	}
+
 }
