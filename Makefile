@@ -1,4 +1,4 @@
-BINARY_NAME := web-paste
+BINARY_NAME := webpaste
 BIN_DIR := ./bin
 SRC := ./...
 

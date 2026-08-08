@@ -1,4 +1,4 @@
-module web-paste
+module webpaste
 
 go 1.26.5
 
