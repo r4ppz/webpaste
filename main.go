@@ -40,7 +40,7 @@ func main() {
 	const (
 		textBox       = `[contenteditable="true"][role="textbox"]`
 		sendButton    = `button[data-testid="send-button"]`
-		messageToSend = `Fuck you! Shut the fuck up!`
+		messageToSend = `Hello, testing!`
 	)
 
 	err := chromedp.Run(
