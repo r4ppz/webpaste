@@ -1,9 +1,11 @@
 GO ?= go
 BINARY_NAME := webpaste
 BIN_DIR := bin
+PREFIX ?= $(HOME)/.local
+DESTDIR ?=
 SRC := ./...
 
-.PHONY: all build run clean fmt vet lint test
+.PHONY: all build run install clean fmt vet lint test
 
 all: build
 
@@ -13,6 +15,9 @@ build:
 
 run: build
 	./$(BIN_DIR)/$(BINARY_NAME)
+
+install: build
+	install -Dm755 $(BIN_DIR)/$(BINARY_NAME) $(DESTDIR)$(PREFIX)/bin/$(BINARY_NAME)
 
 clean:
 	@rm -rf $(BIN_DIR)
