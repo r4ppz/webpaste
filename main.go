@@ -15,7 +15,6 @@ import (
 )
 
 type chatConfig struct {
-	appURL             string
 	textBoxSelector    string
 	sendButtonSelector string
 	message            string
@@ -26,6 +25,7 @@ type chromeConfig struct {
 	headless         bool
 	userDataDir      string
 	profileDir       string
+	appURL           string
 	enableAutomation bool
 }
 
@@ -70,7 +70,6 @@ func main() {
 
 func defaultConfig() (chatConfig, chromeConfig) {
 	cc := chatConfig{
-		appURL:             "https://chatgpt.com/?temporary-chat=true",
 		textBoxSelector:    `[contenteditable="true"][role="textbox"]`,
 		sendButtonSelector: `button[data-testid="send-button"]`,
 	}
@@ -80,6 +79,7 @@ func defaultConfig() (chatConfig, chromeConfig) {
 		headless:         false,
 		userDataDir:      "/home/r4ppz/.config/BraveSoftware/Brave-Browser",
 		profileDir:       "Default",
+		appURL:           "https://chatgpt.com/?temporary-chat=true",
 		enableAutomation: false,
 	}
 
@@ -92,6 +92,7 @@ func buildAllocatorOpts(cfg chromeConfig) []chromedp.ExecAllocatorOption {
 		chromedp.Flag("headless", cfg.headless),
 		chromedp.Flag("user-data-dir", cfg.userDataDir),
 		chromedp.Flag("profile-directory", cfg.profileDir),
+		chromedp.Flag("app", cfg.appURL),
 		chromedp.Flag("enable-automation", cfg.enableAutomation),
 	)
 }
