@@ -22,6 +22,33 @@ type chatConfig struct {
 	message            string
 }
 
+func main() {
+	cfg := defaultConfig()
+	allocOpts := buildAllocatorOpts(cfg)
+
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOpts...)
+	defer cancelAlloc()
+
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	defer cancelCtx()
+
+	if err := runAutomation(ctx, cfg); err != nil {
+		log.Fatalf("automation failed: %v", err)
+	}
+
+	// Wait until either the browser is closed or Ctrl+C is pressed.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sig)
+
+	select {
+	case <-ctx.Done():
+		log.Println("Browser closed.")
+	case <-sig:
+		log.Println("Ctrl+C received.")
+	}
+}
+
 func defaultConfig() chatConfig {
 	return chatConfig{
 		execPath:           "/usr/bin/brave",
@@ -55,31 +82,4 @@ func runAutomation(ctx context.Context, cfg chatConfig) error {
 		chromedp.WaitNotPresent(cfg.sendButtonSelector+"[disabled]", chromedp.ByQuery),
 		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
 	)
-}
-
-func main() {
-	cfg := defaultConfig()
-	allocOpts := buildAllocatorOpts(cfg)
-
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOpts...)
-	defer cancelAlloc()
-
-	ctx, cancelCtx := chromedp.NewContext(allocCtx)
-	defer cancelCtx()
-
-	if err := runAutomation(ctx, cfg); err != nil {
-		log.Fatalf("automation failed: %v", err)
-	}
-
-	// Wait until either the browser is closed or Ctrl+C is pressed.
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(sig)
-
-	select {
-	case <-ctx.Done():
-		log.Println("Browser closed.")
-	case <-sig:
-		log.Println("Ctrl+C received.")
-	}
 }
