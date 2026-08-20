@@ -14,22 +14,6 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-type chatConfig struct {
-	textBoxSelector    string
-	sendButtonSelector string
-	preMessage         string
-	mainMessage        string
-}
-
-type chromeConfig struct {
-	execPath         string
-	headless         bool
-	userDataDir      string
-	profileDir       string
-	appURL           string
-	enableAutomation bool
-}
-
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
@@ -67,6 +51,22 @@ func main() {
 	case <-sig:
 		log.Println("Ctrl+C received.")
 	}
+}
+
+type chatConfig struct {
+	textBoxSelector    string
+	sendButtonSelector string
+	preMessage         string
+	mainMessage        string
+}
+
+type chromeConfig struct {
+	execPath         string
+	headless         bool
+	userDataDir      string
+	profileDir       string
+	appURL           string
+	enableAutomation bool
 }
 
 func defaultConfig() (chatConfig, chromeConfig) {
