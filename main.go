@@ -15,6 +15,11 @@ import (
 )
 
 func main() {
+	if _, err := exec.LookPath("wl-paste"); err != nil {
+		fmt.Errorf("wl-paste not found in PATH: %w", err)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 
