@@ -30,7 +30,19 @@ type chromeConfig struct {
 }
 
 func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	msg, err := getClipboard(ctx)
+	if err != nil {
+		fmt.Printf("Error reading clipboard: %v\n", err)
+	}
+	if msg == "" {
+		msg = "Clipboard is empty"
+	}
+
 	chatCfg, chromeCfg := defaultConfig()
+	chatCfg.message = msg
 	allocOpts := buildAllocatorOpts(chromeCfg)
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOpts...)
@@ -57,22 +69,10 @@ func main() {
 }
 
 func defaultConfig() (chatConfig, chromeConfig) {
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	msg, err := getClipboard(ctx)
-	if err != nil {
-		fmt.Printf("Error reading clipboard: %v\n", err)
-	}
-	if msg == "" {
-		msg = "Clipboard is empty"
-	}
-
 	cc := chatConfig{
 		appURL:             "https://chatgpt.com/?temporary-chat=true",
 		textBoxSelector:    `[contenteditable="true"][role="textbox"]`,
 		sendButtonSelector: `button[data-testid="send-button"]`,
-		message:            msg,
 	}
 
 	chc := chromeConfig{
@@ -101,7 +101,6 @@ func runAutomation(ctx context.Context, cfg chatConfig) error {
 		chromedp.WaitVisible(cfg.textBoxSelector, chromedp.ByQuery),
 		chromedp.Click(cfg.textBoxSelector, chromedp.ByQuery),
 		chromedp.SendKeys(cfg.textBoxSelector, cfg.message, chromedp.ByQuery),
-		chromedp.WaitNotPresent(cfg.sendButtonSelector+"[disabled]", chromedp.ByQuery),
 		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
 	)
 }
