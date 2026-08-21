@@ -31,8 +31,9 @@ func main() {
 		msg = "Clipboard is empty"
 	}
 
+	premsg := "Explain: "
 	chatCfg, chromeCfg := defaultConfig()
-	chatCfg.mainMessage = chatCfg.preMessage + msg
+	chatCfg.message = premsg + msg
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(
 		context.Background(),
@@ -76,12 +77,9 @@ type chromeConfig struct {
 }
 
 func defaultConfig() (chatConfig, chromeConfig) {
-	inputSequence := "Explain: " + kb.Paste
-
 	cc := chatConfig{
 		textBoxSelector:    `[contenteditable="true"][role="textbox"]`,
 		sendButtonSelector: `button[data-testid="send-button"]`,
-		message:            inputSequence,
 	}
 
 	chc := chromeConfig{
@@ -111,8 +109,7 @@ func runAutomation(ctx context.Context, cfg chatConfig) error {
 	return chromedp.Run(ctx,
 		chromedp.WaitVisible(cfg.textBoxSelector, chromedp.ByQuery),
 		chromedp.Click(cfg.textBoxSelector, chromedp.ByQuery),
-		// chromedp.SendKeys(cfg.textBoxSelector, cfg.mainMessage, chromedp.ByQuery),
-		chromedp.SendKeys(cfg.textBoxSelector, inputSequence, chromedp.ByQuery),
+		chromedp.SendKeys(cfg.textBoxSelector, cfg.message, chromedp.ByQuery),
 		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
 	)
 }
@@ -120,7 +117,7 @@ func runAutomation(ctx context.Context, cfg chatConfig) error {
 func getClipboard(ctx context.Context) (string, error) {
 	var out bytes.Buffer
 
-	cmd := exec.CommandContext(ctx, "wl-paste", "-n", "-t", "text/plain")
+	cmd := exec.CommandContext(ctx, "wl-paste", "-n")
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 
