@@ -50,7 +50,7 @@ func main() {
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
 	defer cancelCtx()
 
-	if chromedp.Run(ctx, automateChatTask(chatCfg)); err != nil {
+	if err := chromedp.Run(ctx, automateChatTask(chatCfg)); err != nil {
 		log.Fatalf("automation failed: %v", err)
 	}
 
