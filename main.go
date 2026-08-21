@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	premsg := flag.String("premsg", "Explain: ", "Prefix message for the clipboard content")
+	premsg := flag.String("premsg", "Explain: \n", "Prefix message for the clipboard content")
 	flag.Parse()
 
 	if _, err := exec.LookPath("wl-paste"); err != nil {
