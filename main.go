@@ -11,11 +11,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
-	"github.com/chromedp/cdproto/input"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 )
@@ -130,24 +128,6 @@ func automateChatTask(cfg chatConfig) chromedp.Tasks {
 		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
 		chromedp.SendKeys(cfg.textBoxSelector, kb.Enter, chromedp.ByQuery),
 	}
-}
-
-//nolint:unused // ill remove this later if the new one is good.
-func typeMultilineTask(selector, text string) chromedp.Tasks {
-	lines := strings.Split(text, "\n")
-	var tasks chromedp.Tasks
-
-	for i, line := range lines {
-		tasks = append(tasks, chromedp.SendKeys(selector, line, chromedp.ByQuery))
-		if i < len(lines)-1 {
-			tasks = append(
-				tasks,
-				chromedp.KeyEvent(kb.Enter, chromedp.KeyModifiers(input.ModifierShift)),
-			)
-		}
-	}
-
-	return tasks
 }
 
 func typeDirectTask(selector, text string) chromedp.Tasks {
