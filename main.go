@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -23,7 +24,7 @@ func main() {
 	flag.Parse()
 
 	if _, err := exec.LookPath("wl-paste"); err != nil {
-		fmt.Errorf("wl-paste not found in PATH: %w", err)
+		log.Fatalf("wl-paste not found in PATH: %v", err)
 		return
 	}
 
@@ -39,7 +40,7 @@ func main() {
 	}
 
 	chatCfg, chromeCfg := defaultConfig()
-	chatCfg.message = *premsg + msg
+	chatCfg.message = wrapMsg(*premsg, msg)
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(
 		context.Background(),
@@ -51,7 +52,7 @@ func main() {
 	defer cancelCtx()
 
 	if err := chromedp.Run(ctx, automateChatTask(chatCfg)); err != nil {
-		log.Fatalf("automation failed: %v", err)
+		log.Fatalf("wl-paste not found in PATH: %v", err)
 	}
 
 	// Wait until either the browser is closed or Ctrl+C is pressed.
@@ -115,12 +116,14 @@ func automateChatTask(cfg chatConfig) chromedp.Tasks {
 	return chromedp.Tasks{
 		chromedp.WaitVisible(cfg.textBoxSelector, chromedp.ByQuery),
 		chromedp.Click(cfg.textBoxSelector, chromedp.ByQuery),
-		typeMultilineTask(cfg.textBoxSelector, cfg.message),
+		typeDirectTask(cfg.textBoxSelector, cfg.message),
 		chromedp.WaitEnabled(cfg.sendButtonSelector, chromedp.ByQuery),
 		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
+		chromedp.SendKeys(cfg.textBoxSelector, kb.Enter, chromedp.ByQuery),
 	}
 }
 
+//nolint:unused // ill remove this later if the new one is good.
 func typeMultilineTask(selector, text string) chromedp.Tasks {
 	lines := strings.Split(text, "\n")
 	var tasks chromedp.Tasks
@@ -136,6 +139,13 @@ func typeMultilineTask(selector, text string) chromedp.Tasks {
 	}
 
 	return tasks
+}
+
+func typeDirectTask(selector, text string) chromedp.Tasks {
+	js := fmt.Sprintf(`document.querySelector(%q).innerText = %s`, selector, strconv.Quote(text))
+	return chromedp.Tasks{
+		chromedp.Evaluate(js, nil),
+	}
 }
 
 func getClipboard(ctx context.Context) (string, error) {
@@ -154,4 +164,8 @@ func getClipboard(ctx context.Context) (string, error) {
 	}
 
 	return out.String(), nil
+}
+
+func wrapMsg(premsg, msg string) string {
+	return premsg + "\n```\n" + msg + "\n```\n"
 }
