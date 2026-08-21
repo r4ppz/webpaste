@@ -1,38 +1,18 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/kb"
 )
 
 func main() {
-	if _, err := exec.LookPath("wl-paste"); err != nil {
-		fmt.Errorf("wl-paste not found in PATH: %w", err)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	msg, err := getClipboard(ctx)
-	if err != nil {
-		fmt.Printf("Error reading clipboard: %v\n", err)
-	}
-	if msg == "" {
-		msg = "Clipboard is empty"
-	}
-
 	chatCfg, chromeCfg := defaultConfig()
-	chatCfg.mainMessage = chatCfg.preMessage + msg
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(
 		context.Background(),
@@ -107,28 +87,13 @@ func buildAllocatorOpts(cfg chromeConfig) []chromedp.ExecAllocatorOption {
 }
 
 func runAutomation(ctx context.Context, cfg chatConfig) error {
+	inputSequence := cfg.preMessage + kb.Paste
+
 	return chromedp.Run(ctx,
 		chromedp.WaitVisible(cfg.textBoxSelector, chromedp.ByQuery),
 		chromedp.Click(cfg.textBoxSelector, chromedp.ByQuery),
-		chromedp.SendKeys(cfg.textBoxSelector, cfg.mainMessage, chromedp.ByQuery),
+		// chromedp.SendKeys(cfg.textBoxSelector, cfg.mainMessage, chromedp.ByQuery),
+		chromedp.SendKeys(cfg.textBoxSelector, inputSequence, chromedp.ByQuery),
 		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
 	)
-}
-
-func getClipboard(ctx context.Context) (string, error) {
-	var out bytes.Buffer
-
-	cmd := exec.CommandContext(ctx, "wl-paste", "-n", "-t", "text/plain")
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf(
-			"wl-paste failed: %w - output: %s",
-			err,
-			out.String(),
-		)
-	}
-
-	return out.String(), nil
 }
