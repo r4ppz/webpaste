@@ -9,10 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/chromedp/cdproto/input"
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/kb"
 )
 
 func main() {
@@ -47,7 +50,7 @@ func main() {
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
 	defer cancelCtx()
 
-	if err := runAutomation(ctx, chatCfg); err != nil {
+	if chromedp.Run(ctx, automateChatTask(chatCfg)); err != nil {
 		log.Fatalf("automation failed: %v", err)
 	}
 
@@ -108,13 +111,31 @@ func buildAllocatorOpts(cfg chromeConfig) []chromedp.ExecAllocatorOption {
 	)
 }
 
-func runAutomation(ctx context.Context, cfg chatConfig) error {
-	return chromedp.Run(ctx,
+func automateChatTask(cfg chatConfig) chromedp.Tasks {
+	return chromedp.Tasks{
 		chromedp.WaitVisible(cfg.textBoxSelector, chromedp.ByQuery),
 		chromedp.Click(cfg.textBoxSelector, chromedp.ByQuery),
-		chromedp.SendKeys(cfg.textBoxSelector, cfg.message, chromedp.ByQuery),
+		typeMultilineTask(cfg.textBoxSelector, cfg.message),
+		chromedp.WaitEnabled(cfg.sendButtonSelector, chromedp.ByQuery),
 		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
-	)
+	}
+}
+
+func typeMultilineTask(selector, text string) chromedp.Tasks {
+	lines := strings.Split(text, "\n")
+	var tasks chromedp.Tasks
+
+	for i, line := range lines {
+		tasks = append(tasks, chromedp.SendKeys(selector, line, chromedp.ByQuery))
+		if i < len(lines)-1 {
+			tasks = append(
+				tasks,
+				chromedp.KeyEvent(kb.Enter, chromedp.KeyModifiers(input.ModifierShift)),
+			)
+		}
+	}
+
+	return tasks
 }
 
 func getClipboard(ctx context.Context) (string, error) {
