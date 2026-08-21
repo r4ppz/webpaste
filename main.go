@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -89,10 +90,18 @@ func defaultConfig() (chatConfig, chromeConfig) {
 		sendButtonSelector: `button[data-testid="send-button"]`,
 	}
 
+	home, _ := os.UserHomeDir()
+	userData := filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser")
+
+	execPath, err := exec.LookPath("brave")
+	if err != nil {
+		execPath = "/usr/bin/brave"
+	}
+
 	chc := chromeConfig{
-		execPath:         "/usr/bin/brave",
+		execPath:         execPath,
 		headless:         false,
-		userDataDir:      "/home/r4ppz/.config/BraveSoftware/Brave-Browser",
+		userDataDir:      userData,
 		profileDir:       "Default",
 		appURL:           "https://chatgpt.com/?temporary-chat=true",
 		enableAutomation: false,
