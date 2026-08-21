@@ -43,8 +43,7 @@ func main() {
 type chatConfig struct {
 	textBoxSelector    string
 	sendButtonSelector string
-	preMessage         string
-	mainMessage        string
+	message            string
 }
 
 type chromeConfig struct {
@@ -57,10 +56,12 @@ type chromeConfig struct {
 }
 
 func defaultConfig() (chatConfig, chromeConfig) {
+	inputSequence := "Explain: " + kb.Paste
+
 	cc := chatConfig{
 		textBoxSelector:    `[contenteditable="true"][role="textbox"]`,
 		sendButtonSelector: `button[data-testid="send-button"]`,
-		preMessage:         "Explain: ",
+		message:            inputSequence,
 	}
 
 	chc := chromeConfig{
@@ -87,13 +88,10 @@ func buildAllocatorOpts(cfg chromeConfig) []chromedp.ExecAllocatorOption {
 }
 
 func runAutomation(ctx context.Context, cfg chatConfig) error {
-	inputSequence := cfg.preMessage + kb.Paste
-
 	return chromedp.Run(ctx,
 		chromedp.WaitVisible(cfg.textBoxSelector, chromedp.ByQuery),
 		chromedp.Click(cfg.textBoxSelector, chromedp.ByQuery),
-		// chromedp.SendKeys(cfg.textBoxSelector, cfg.mainMessage, chromedp.ByQuery),
-		chromedp.SendKeys(cfg.textBoxSelector, inputSequence, chromedp.ByQuery),
+		chromedp.SendKeys(cfg.textBoxSelector, cfg.message, chromedp.ByQuery),
 		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
 	)
 }
