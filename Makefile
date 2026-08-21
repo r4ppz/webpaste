@@ -16,9 +16,6 @@ build:
 run: build
 	./$(BIN_DIR)/$(BINARY_NAME)
 
-install: build
-	install -Dm755 $(BIN_DIR)/$(BINARY_NAME) $(DESTDIR)$(PREFIX)/bin/$(BINARY_NAME)
-
 clean:
 	@rm -rf $(BIN_DIR)
 
@@ -33,3 +30,6 @@ lint:
 
 test:
 	$(GO) test ./...
+
+install: build
+	install -Dm755 $(BIN_DIR)/$(BINARY_NAME) $(DESTDIR)$(PREFIX)/bin/$(BINARY_NAME)

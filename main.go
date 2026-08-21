@@ -33,9 +33,11 @@ func main() {
 
 	chatCfg, chromeCfg := defaultConfig()
 	chatCfg.mainMessage = chatCfg.preMessage + msg
-	allocOpts := buildAllocatorOpts(chromeCfg)
 
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), allocOpts...)
+	allocCtx, cancelAlloc := chromedp.NewExecAllocator(
+		context.Background(),
+		buildAllocatorOpts(chromeCfg)...,
+	)
 	defer cancelAlloc()
 
 	ctx, cancelCtx := chromedp.NewContext(allocCtx)
