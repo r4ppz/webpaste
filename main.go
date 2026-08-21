@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -15,6 +16,9 @@ import (
 )
 
 func main() {
+	premsg := flag.String("premsg", "Explain: ", "Prefix message for the clipboard content")
+	flag.Parse()
+
 	if _, err := exec.LookPath("wl-paste"); err != nil {
 		fmt.Errorf("wl-paste not found in PATH: %w", err)
 		return
@@ -31,9 +35,8 @@ func main() {
 		msg = "Clipboard is empty"
 	}
 
-	premsg := "Explain: "
 	chatCfg, chromeCfg := defaultConfig()
-	chatCfg.message = premsg + msg
+	chatCfg.message = *premsg + msg
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(
 		context.Background(),
