@@ -7,5 +7,5 @@ A small program to automate my very repetitive workflow.
 Example usage:
 
 ```bash
-go run . --premsg $'Explain this in detail: \n'
+go run . --premsg "Explain this in detail:"
 ```

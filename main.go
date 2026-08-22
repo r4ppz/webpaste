@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	premsg := flag.String("premsg", "Explain: \n", "Prefix message for the clipboard content")
+	premsg := flag.String("premsg", "Explain: ", "Prefix message for the clipboard content")
 	flag.Parse()
 
 	if _, err := exec.LookPath("wl-paste"); err != nil {
@@ -38,7 +38,7 @@ func main() {
 		msg = "Clipboard is empty"
 	}
 
-	chatCfg, chromeCfg := defaultConfig()
+	chatCfg, chromeCfg := populateConfig()
 	chatCfg.message = wrapMsg(*premsg, msg)
 
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(
@@ -82,7 +82,7 @@ type chromeConfig struct {
 	enableAutomation bool
 }
 
-func defaultConfig() (chatConfig, chromeConfig) {
+func populateConfig() (chatConfig, chromeConfig) {
 	cc := chatConfig{
 		textBoxSelector:    `[contenteditable="true"][role="textbox"]`,
 		sendButtonSelector: `button[data-testid="send-button"]`,
