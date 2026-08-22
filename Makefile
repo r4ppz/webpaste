@@ -5,7 +5,7 @@ PREFIX ?= $(HOME)/.local
 DESTDIR ?=
 SRC := ./...
 
-.PHONY: all build run install clean fmt vet lint test golint staticcheck
+.PHONY: all build run install clean fmt vet lint test staticcheck
 
 all: build
 
@@ -25,13 +25,10 @@ fmt:
 vet:
 	$(GO) vet $(SRC)
 
-golint:
-	$(GO) run golang.org/x/lint/golint@latest ./..
-
 staticcheck:
 	$(GO) run honnef.co/go/tools/cmd/staticcheck@latest $(SRC)
 
-lint: vet golint staticcheck
+lint: vet staticcheck
 
 test:
 	$(GO) test ./...
