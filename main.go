@@ -121,11 +121,11 @@ func buildAllocatorOpts(cfg chromeConfig) []chromedp.ExecAllocatorOption {
 func automateChatTask(cfg chatConfig) chromedp.Tasks {
 	return chromedp.Tasks{
 		chromedp.WaitVisible(cfg.textBoxSelector, chromedp.ByQuery),
-		chromedp.Click(cfg.textBoxSelector, chromedp.ByQuery),
+		chromedp.Focus(cfg.textBoxSelector, chromedp.ByQuery),
 		typeDirectTask(cfg.textBoxSelector, cfg.message),
 		chromedp.WaitEnabled(cfg.sendButtonSelector, chromedp.ByQuery),
-		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
 		chromedp.SendKeys(cfg.textBoxSelector, kb.Enter, chromedp.ByQuery),
+		chromedp.Click(cfg.sendButtonSelector, chromedp.ByQuery),
 	}
 }
 
