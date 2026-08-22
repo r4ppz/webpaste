@@ -24,7 +24,6 @@ func main() {
 
 	if _, err := exec.LookPath("wl-paste"); err != nil {
 		log.Fatalf("wl-paste not found in PATH: %v", err)
-		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -51,7 +50,7 @@ func main() {
 	defer cancelCtx()
 
 	if err := chromedp.Run(ctx, automateChatTask(chatCfg)); err != nil {
-		log.Fatalf("wl-paste not found in PATH: %v", err)
+		log.Fatalf("chromedp execution failed: %v", err)
 	}
 
 	// Wait until either the browser is closed or Ctrl+C is pressed.
@@ -84,7 +83,7 @@ type chromeConfig struct {
 
 func populateConfig() (chatConfig, chromeConfig) {
 	cc := chatConfig{
-		textBoxSelector:    `[contenteditable="true"][role="textbox"]`,
+		textBoxSelector:    `textarea[name="prompt-textarea"]`,
 		sendButtonSelector: `button[data-testid="send-button"]`,
 	}
 
@@ -131,7 +130,7 @@ func automateChatTask(cfg chatConfig) chromedp.Tasks {
 }
 
 func typeDirectTask(selector, text string) chromedp.Tasks {
-	js := fmt.Sprintf(`document.querySelector(%q).innerText = %s`, selector, strconv.Quote(text))
+	js := fmt.Sprintf(`document.querySelector(%q).value = %s`, selector, strconv.Quote(text))
 	return chromedp.Tasks{
 		chromedp.Evaluate(js, nil),
 	}
