@@ -4,6 +4,7 @@ BIN_DIR := bin
 PREFIX ?= $(HOME)/.local
 DESTDIR ?=
 SRC := ./...
+CMD := ./cmd/webpaste
 
 .PHONY: all build run install clean fmt vet lint test staticcheck
 
@@ -11,7 +12,7 @@ all: build
 
 build:
 	@mkdir -p $(BIN_DIR)
-	$(GO) build -trimpath -o $(BIN_DIR)/$(BINARY_NAME) .
+	$(GO) build -trimpath -o $(BIN_DIR)/$(BINARY_NAME) $(CMD)
 
 run: build
 	./$(BIN_DIR)/$(BINARY_NAME)
