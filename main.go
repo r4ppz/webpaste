@@ -1,70 +1,30 @@
 package main
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 )
 
-func main() {
-	premsg := flag.String("premsg", "Explain: ", "Prefix message for the clipboard content")
-	flag.Parse()
-
-	if _, err := exec.LookPath("wl-paste"); err != nil {
-		log.Fatalf("wl-paste not found in PATH: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	msg, err := getClipboard(ctx)
-	if err != nil {
-		fmt.Printf("Error reading clipboard: %v\n", err)
-	}
-	if msg == "" {
-		msg = "Clipboard is empty"
-	}
-
-	chatCfg, chromeCfg := populateConfig()
-	chatCfg.message = wrapMsg(*premsg, msg)
-
-	allocCtx, cancelAlloc := chromedp.NewExecAllocator(
-		context.Background(),
-		buildAllocatorOpts(chromeCfg)...,
-	)
-	defer cancelAlloc()
-
-	ctx, cancelCtx := chromedp.NewContext(allocCtx)
-	defer cancelCtx()
-
-	if err := chromedp.Run(ctx, automateChatTask(chatCfg)); err != nil {
-		log.Fatalf("chromedp execution failed: %v", err)
-	}
-
-	// Wait until either the browser is closed or Ctrl+C is pressed.
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(sig)
-
-	select {
-	case <-ctx.Done():
-		log.Println("Browser closed.")
-	case <-sig:
-		log.Println("Ctrl+C received.")
-	}
-}
+const (
+	debugPort = "9222"
+	debugURL  = "http://127.0.0.1:" + debugPort
+)
 
 type chatConfig struct {
 	textBoxSelector    string
@@ -73,53 +33,108 @@ type chatConfig struct {
 }
 
 type chromeConfig struct {
-	execPath         string
-	headless         bool
-	userDataDir      string
-	profileDir       string
-	appURL           string
-	enableAutomation bool
+	execPath    string
+	userDataDir string
+	profileDir  string
+	appURL      string
 }
 
-func populateConfig() (chatConfig, chromeConfig) {
-	cc := chatConfig{
-		textBoxSelector:    `textarea[name="prompt-textarea"]`,
-		sendButtonSelector: `button[data-testid="send-button"]`,
+func main() {
+	if err := run(); err != nil {
+		log.Fatalf("error: %v", err)
 	}
-
-	home, _ := os.UserHomeDir()
-	userData := filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser")
-
-	execPath, err := exec.LookPath("brave")
-	if err != nil {
-		execPath = "/usr/bin/brave"
-	}
-
-	chc := chromeConfig{
-		execPath:         execPath,
-		headless:         false,
-		userDataDir:      userData,
-		profileDir:       "Default",
-		appURL:           "https://chatgpt.com/?temporary-chat=true",
-		enableAutomation: false,
-	}
-
-	return cc, chc
 }
 
-func buildAllocatorOpts(cfg chromeConfig) []chromedp.ExecAllocatorOption {
-	return append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.ExecPath(cfg.execPath),
-		chromedp.Flag("headless", cfg.headless),
-		chromedp.Flag("user-data-dir", cfg.userDataDir),
-		chromedp.Flag("profile-directory", cfg.profileDir),
-		chromedp.Flag("app", cfg.appURL),
-		chromedp.Flag("enable-automation", cfg.enableAutomation),
+func run() error {
+	premsg := flag.String("premsg", "Explain: ", "Prefix message for clipboard content")
+	flag.Parse()
+
+	if _, err := exec.LookPath("wl-paste"); err != nil {
+		return fmt.Errorf("wl-paste not found in PATH: %w", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	chatCfg, chromeCfg := populateConfig()
+	chatCfg.message = getPromptMessage(ctx, *premsg)
+
+	if err := ensureBrowserRunning(chromeCfg); err != nil {
+		return err
+	}
+
+	taskCtx, isReusing := getTaskContext(ctx, "chatgpt.com")
+
+	if err := chromedp.Run(
+		taskCtx,
+		automateChatTask(chatCfg, chromeCfg.appURL, isReusing)); err != nil {
+		return fmt.Errorf("chromedp execution failed: %w", err)
+	}
+
+	log.Println("Prompt sent successfully!")
+	return nil
+}
+
+func ensureBrowserRunning(cfg chromeConfig) error {
+	if isPortOpen(debugPort) {
+		log.Println("Reusing existing browser window...")
+		return nil
+	}
+
+	log.Println("Launching background browser instance...")
+	cmd := exec.Command(cfg.execPath,
+		"--user-data-dir="+cfg.userDataDir,
+		"--profile-directory="+cfg.profileDir,
+		"--app="+cfg.appURL,
+		"--remote-debugging-port="+debugPort,
 	)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start browser: %w", err)
+	}
+
+	return waitForPort(debugPort, 5*time.Second)
 }
 
-func automateChatTask(cfg chatConfig) chromedp.Tasks {
+func getTaskContext(parentCtx context.Context, domain string) (context.Context, bool) {
+	allocCtx, _ := chromedp.NewRemoteAllocator(parentCtx, debugURL)
+	browserCtx, _ := chromedp.NewContext(allocCtx)
+
+	targetID := findExistingTargetID(domain)
+	if targetID != "" {
+		taskCtx, _ := chromedp.NewContext(browserCtx, chromedp.WithTargetID(targetID))
+		return taskCtx, true
+	}
+
+	return browserCtx, false
+}
+
+func getPromptMessage(ctx context.Context, premsg string) string {
+	msg, err := getClipboard(ctx)
+	if err != nil {
+		log.Printf("Error reading clipboard: %v", err)
+	}
+	if msg == "" {
+		msg = "Clipboard is empty"
+	}
+	return wrapMsg(premsg, msg)
+}
+
+func automateChatTask(cfg chatConfig, appURL string, isReusing bool) chromedp.Tasks {
+	var refreshTask chromedp.Tasks
+
+	if isReusing {
+		refreshTask = chromedp.Tasks{
+			chromedp.Evaluate(fmt.Sprintf(`window.location.href = %s;`, strconv.Quote(appURL)), nil),
+			chromedp.Sleep(1 * time.Second),
+		}
+	} else {
+		refreshTask = chromedp.Tasks{
+			chromedp.Navigate(appURL),
+		}
+	}
+
 	return chromedp.Tasks{
+		refreshTask,
 		chromedp.WaitVisible(cfg.textBoxSelector, chromedp.ByQuery),
 		chromedp.Focus(cfg.textBoxSelector, chromedp.ByQuery),
 		typeDirectTask(cfg.textBoxSelector, cfg.message),
@@ -136,22 +151,88 @@ func typeDirectTask(selector, text string) chromedp.Tasks {
 	}
 }
 
-func getClipboard(ctx context.Context) (string, error) {
-	var out bytes.Buffer
+func isPortOpen(port string) bool {
+	client := http.Client{Timeout: 300 * time.Millisecond}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/json/version")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
 
-	cmd := exec.CommandContext(ctx, "wl-paste", "-n")
-	cmd.Stdout = &out
-	cmd.Stderr = &out
+func waitForPort(port string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if isPortOpen(port) {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Errorf("timeout waiting for port %s", port)
+}
 
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf(
-			"wl-paste failed: %w - output: %s",
-			err,
-			out.String(),
-		)
+func findExistingTargetID(domain string) target.ID {
+	client := http.Client{Timeout: 500 * time.Millisecond}
+	resp, err := client.Get(debugURL + "/json/list")
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	var targets []struct {
+		ID   string `json:"id"`
+		Type string `json:"type"`
+		URL  string `json:"url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&targets); err != nil {
+		return ""
 	}
 
-	return out.String(), nil
+	for _, t := range targets {
+		if t.Type == "page" && strings.Contains(t.URL, domain) {
+			return target.ID(t.ID)
+		}
+	}
+	return ""
+}
+
+func getClipboard(parentCtx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, 500*time.Millisecond)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "wl-paste", "-n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("wl-paste failed: %w - output: %s", err, string(out))
+	}
+
+	return string(out), nil
+}
+
+func populateConfig() (chatConfig, chromeConfig) {
+	cc := chatConfig{
+		textBoxSelector:    `textarea[name="prompt-textarea"]`,
+		sendButtonSelector: `button[data-testid="send-button"]`,
+	}
+
+	home, _ := os.UserHomeDir()
+	userData := filepath.Join(home, ".config", "BraveSoftware", "Brave-Browser")
+	// userData := filepath.Join(home, ".config", "BraveSoftware", "Brave-Automation")
+
+	execPath, err := exec.LookPath("brave")
+	if err != nil {
+		execPath = "/usr/bin/brave"
+	}
+
+	chc := chromeConfig{
+		execPath:    execPath,
+		userDataDir: userData,
+		profileDir:  "Default",
+		appURL:      "https://chatgpt.com/?temporary-chat=true",
+	}
+
+	return cc, chc
 }
 
 func wrapMsg(premsg, msg string) string {
